@@ -389,19 +389,19 @@
                     }
                 }
 
-                // Define unique colors for each client - randomized but deterministic
+                // Define unique colors for each client
                 let colorPalette = [
-  "#FF5733",
-  "#33C1FF",
-  "#8D33FF",
-  "#33FF57",
-  "#FF33A8",
-  "#FFD133",
-  "#33FFD1",
-  "#FF3333",
-  "#3375FF",
-  "#75FF33"
-];
+                    "#FF5733",
+                    "#33C1FF",
+                    "#8D33FF",
+                    "#33FF57",
+                    "#FF33A8",
+                    "#FFD133",
+                    "#33FFD1",
+                    "#FF3333",
+                    "#3375FF",
+                    "#75FF33"
+                ];
 
                 // Shuffle colors deterministically based on data
                 let shuffledColors = colorPalette.slice();
@@ -416,11 +416,9 @@
                     shuffledColors[jIdx] = temp;
                 }
 
-                // Create nodes
-                let nodes = [];
-                let nodeMap = {};
-                
-                // Add subscription nodes on the left (only used ones)
+                // Create subscription nodes - flat list on the left
+                let subscriptionNodes = [];
+                let subscriptionNodeMap = {};
                 for (let i = 0; i < usedSubscriptions.length; i++) {
                     let node = {
                         id: usedSubscriptions[i].id,
@@ -429,11 +427,13 @@
                         x: 100,
                         y: (i + 1) * (height / (usedSubscriptions.length + 1))
                     };
-                    nodes.push(node);
-                    nodeMap[node.id] = node;
+                    subscriptionNodes.push(node);
+                    subscriptionNodeMap[node.id] = node;
                 }
 
-                // Add client nodes on the right with unique randomized colors
+                // Create client nodes
+                let clientNodes = [];
+                let clientNodeMap = {};
                 for (let i = 0; i < clientsWithSubs.length; i++) {
                     let node = {
                         id: clientsWithSubs[i].id,
@@ -443,8 +443,8 @@
                         x: width - 100,
                         y: (i + 1) * (height / (clientsWithSubs.length + 1))
                     };
-                    nodes.push(node);
-                    nodeMap[node.id] = node;
+                    clientNodes.push(node);
+                    clientNodeMap[node.id] = node;
                 }
 
                 // Create links
@@ -453,11 +453,11 @@
                     let client = clientsWithSubs[i];
                     for (let j = 0; j < client.subscribedWorkspaceIds.length; j++) {
                         let subId = client.subscribedWorkspaceIds[j];
-                        if (nodeMap[subId]) {
+                        if (subscriptionNodeMap[subId]) {
                             links.push({
-                                source: nodeMap[subId],
-                                target: nodeMap[client.id],
-                                color: nodeMap[client.id].color
+                                source: subscriptionNodeMap[subId],
+                                target: clientNodeMap[client.id],
+                                color: clientNodeMap[client.id].color
                             });
                         }
                     }
@@ -477,17 +477,104 @@
                     .attr('stroke-width', 2.5)
                     .attr('opacity', 0.7);
 
-                // Draw nodes
-                let nodeGroups = svg.selectAll('.mapping-node')
-                    .data(nodes)
+                // Draw subscription nodes (flat list)
+                let subNodeGroups = svg.selectAll('.mapping-sub-node')
+                    .data(subscriptionNodes)
                     .enter()
                     .append('g')
-                    .attr('class', 'mapping-node')
+                    .attr('class', 'mapping-sub-node')
                     .attr('transform', function(d) { 
                         return 'translate(' + d.x + ',' + d.y + ')'; 
                     });
 
-                nodeGroups.append('rect')
+                subNodeGroups.append('rect')
+                    .attr('x', -30)
+                    .attr('y', -14)
+                    .attr('width', 60)
+                    .attr('height', 28)
+                    .attr('rx', 5)
+                    .attr('ry', 5)
+                    .attr('stroke-width', 2)
+                    .attr('stroke', '#0C2340')
+                    .attr('fill', '#0369A1')
+                    .style('filter', 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15))');
+
+                subNodeGroups.append('text')
+                    .attr('x', 0)
+                    .attr('y', 0)
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#FFFFFF')
+                    .attr('font-weight', '600')
+                    .attr('font-size', '11px')
+                    .text(function(d) { 
+                        return d.name; 
+                    });
+
+                // Draw client nodes with drag functionality
+                let clientNodeGroups = svg.selectAll('.mapping-client-node')
+                    .data(clientNodes)
+                    .enter()
+                    .append('g')
+                    .attr('class', 'mapping-client-node')
+                    .attr('transform', function(d) { 
+                        return 'translate(' + d.x + ',' + d.y + ')'; 
+                    })
+                    .call(d3.drag()
+                        .on('start', dragStarted)
+                        .on('drag', dragged)
+                        .on('end', dragEnded));
+
+                let draggedClientId = null;
+                let dragLine = null;
+
+                function dragStarted(event, d) {
+                    draggedClientId = d;
+                    dragLine = svg.append('line')
+                        .attr('class', 'drag-line')
+                        .attr('stroke', d.color)
+                        .attr('stroke-width', 2)
+                        .attr('stroke-dasharray', '5,5')
+                        .attr('opacity', 0.7);
+                }
+
+                function dragged(event, d) {
+                    if (dragLine) {
+                        dragLine.attr('x1', d.x)
+                            .attr('y1', d.y)
+                            .attr('x2', event.x)
+                            .attr('y2', event.y);
+                    }
+                }
+
+                function dragEnded(event, d) {
+                    if (dragLine) {
+                        dragLine.remove();
+                    }
+
+                    // Check if dropped on a subscription node
+                    let droppedOnSubscription = null;
+                    for (let i = 0; i < subscriptionNodes.length; i++) {
+                        let sub = subscriptionNodes[i];
+                        let distance = Math.sqrt(
+                            Math.pow(event.x - sub.x, 2) + 
+                            Math.pow(event.y - sub.y, 2)
+                        );
+                        if (distance < 40) {
+                            droppedOnSubscription = sub;
+                            break;
+                        }
+                    }
+
+                    if (droppedOnSubscription) {
+                        //onClientDragToSubscription(draggedClientId, droppedOnSubscription.id);
+                        alert(`Client "${draggedClientId.name}" want "${droppedOnSubscription.name}" subscription.`);
+                    }
+
+                    draggedClientId = null;
+                }
+
+                clientNodeGroups.append('rect')
                     .attr('x', -35)
                     .attr('y', -16)
                     .attr('width', 70)
@@ -495,17 +582,12 @@
                     .attr('rx', 6)
                     .attr('ry', 6)
                     .attr('stroke-width', 2)
-                    .attr('stroke', function(d) {
-                        if (d.isClient) return d.color;
-                        return '#0C2340';
-                    })
-                    .attr('fill', function(d) {
-                        if (d.isClient) return d.color;
-                        return '#0369A1';
-                    })
-                    .style('filter', 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15))');
+                    .attr('stroke', function(d) { return d.color; })
+                    .attr('fill', function(d) { return d.color; })
+                    .style('filter', 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15))')
+                    .style('cursor', 'grab');
 
-                nodeGroups.append('text')
+                clientNodeGroups.append('text')
                     .attr('x', 0)
                     .attr('y', 0)
                     .attr('dy', '.35em')
