@@ -1,23 +1,596 @@
-<!-- This is profile page with experience details -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>Profile</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>D3 Multiple Inheritance</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            height: 100vh;
+        }
+        .editor-section {
+            width: 30%;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 15px;
+            overflow: hidden;
+        }
+        .viz-section {
+            width: 70%;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        .CodeMirror {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            font-size: 12px;
+        }
+        .editor-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .render-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .render-btn:hover {
+            background-color: #45a049;
+        }
+        .reset-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .reset-btn:hover {
+            background-color: #da190b;
+        }
+        .filters {
+            margin-bottom: 15px;
+        }
+        .filter-group {
+            margin-bottom: 10px;
+        }
+        .filter-group label {
+            margin-right: 15px;
+            font-size: 12px;
+        }
+        .filter-group input[type="radio"] {
+            margin-right: 5px;
+        }
+        .entity-select {
+            padding: 6px 8px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        svg {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
 </head>
-<body class="">
+<body>
     <div class="container">
-        <div class="profile">
-            <div class="profile-image">
-                <img src="images/profile.jpg" alt="profile">
-            </div>
-            <div class="profile-content">
-                <h1>Satya Alasakani</h1>
-                <p>Web Developer</p>
+        <div class="editor-section">
+            <h3>Data Editor</h3>
+            <div class="error-message" id="errorMessage"></div>
+            <textarea id="dataEditor"></textarea>
+            <div class="editor-buttons">
+                <button class="render-btn" onclick="renderData()">Render</button>
+                <button class="reset-btn" onclick="resetData()">Reset</button>
             </div>
         </div>
-    </div>
-</body>
 
+        <div class="viz-section">
+            <h2 style="margin: 0 0 15px 0; text-align: center; color: #333;">Organization Structure</h2>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label><input type="radio" name="filter" value="both" checked> Both</label>
+                    <label><input type="radio" name="filter" value="subscriptions"> Subscriptions</label>
+                    <label><input type="radio" name="filter" value="clients"> Clients</label>
+                    <label><input type="radio" name="filter" value="subscriptions-clients"> Subscriptions → Clients</label>
+                </div>
+                <div class="filter-group">
+                    <label for="entitySelect" style="font-weight: bold;">Select Entity:</label>
+                    <select id="entitySelect" class="entity-select">
+                        <option value="">-- All Entities --</option>
+                    </select>
+                </div>
+            </div>
+
+            <svg id="diagram"></svg>
+        </div>
+    </div>
+
+    <script>
+        let defaultData = [
+            { id: 1, name: 'IT', isClient: false, status: 'Active', parent_id: null },
+            { id: 2, name: 'IT Admin', isClient: false, status: 'Active', parent_id: 1 },
+            { id: 3, name: 'IT Agent', isClient: false, status: 'Active', parent_id: 1 },
+            { id: 4, name: 'IT Employee', isClient: false, status: 'Active', parent_id: 1 },
+            
+            { id: 5, name: 'HR', isClient: false, status: 'Active', parent_id: null },
+            { id: 6, name: 'HR Admin', isClient: false, status: 'Active', parent_id: 5 },
+            { id: 7, name: 'HR Agent', isClient: false, status: 'Active', parent_id: 5 },
+            { id: 8, name: 'HR Employee', isClient: false, status: 'Active', parent_id: 5 },
+
+            { id: 9, name: 'Finance', isClient: false, status: 'Active', parent_id: null },
+            { id: 10, name: 'Finance Admin', isClient: false, status: 'Active', parent_id: 9 },
+            { id: 11, name: 'Finance Agent', isClient: false, status: 'Active', parent_id: 9 },
+            { id: 12, name: 'Finance Employee', isClient: false, status: 'Active', parent_id: 9 },
+
+            { id: 13, name: 'Amazon', isClient: true, status: 'Active', parent_id: null, subscribedWorkspaceIds: [1, 5, 9] },
+            { id: 14, name: 'Amazon India', isClient: true, status: 'Active', parent_id: 13, subscribedWorkspaceIds: [] },
+            { id: 15, name: 'Amazon USA', isClient: true, status: 'Active', parent_id: 13, subscribedWorkspaceIds: [] },
+            { id: 16, name: 'Amazon UK', isClient: true, status: 'Active', parent_id: 13, subscribedWorkspaceIds: [] },
+            { id: 17, name: 'Amazon Canada', isClient: true, status: 'Active', parent_id: 13, subscribedWorkspaceIds: [] },
+
+            { id: 18, name: 'Apple', isClient: true, status: 'Active', parent_id: null, subscribedWorkspaceIds: [1, 5] },
+            { id: 19, name: 'Apple India', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
+            { id: 20, name: 'Apple USA', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
+            { id: 21, name: 'Apple UK', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [9] },
+            { id: 22, name: 'Apple Canada', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] }
+        ];
+
+        let allData = JSON.parse(JSON.stringify(defaultData));
+        let nodeWidth = 140;
+        let nodeHeight = 60;
+        let levelHeight = 150;
+        let width = 4000;
+        let height = 1200;
+        let currentZoomTransform = null;
+
+        // Initialize CodeMirror
+        let editor = CodeMirror.fromTextArea(document.getElementById('dataEditor'), {
+            mode: 'javascript',
+            theme: 'default',
+            lineNumbers: true,
+            lineWrapping: true,
+            indentUnit: 2,
+            indentWithTabs: false,
+            tabSize: 2
+        });
+
+        editor.setValue(JSON.stringify(defaultData, null, 2));
+        editor.setSize('100%', '100%');
+
+        function showError(message) {
+            let errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function renderData() {
+            hideError();
+            try {
+                let jsonStr = editor.getValue();
+                allData = JSON.parse(jsonStr);
+                
+                if (!Array.isArray(allData)) {
+                    throw new Error('Data must be an array');
+                }
+
+                populateEntitySelect();
+                let filterType = document.querySelector('input[name="filter"]:checked').value;
+                let selectedEntity = document.getElementById('entitySelect').value;
+                renderVisualization(filterType, selectedEntity, true);
+            } catch (error) {
+                showError('Error: ' + error.message);
+            }
+        }
+
+        function resetData() {
+            hideError();
+            allData = JSON.parse(JSON.stringify(defaultData));
+            editor.setValue(JSON.stringify(defaultData, null, 2));
+            populateEntitySelect();
+            let filterType = document.querySelector('input[name="filter"]:checked').value;
+            let selectedEntity = document.getElementById('entitySelect').value;
+            renderVisualization(filterType, selectedEntity, true);
+        }
+
+        function populateEntitySelect() {
+            let entitySelect = document.getElementById('entitySelect');
+            let currentValue = entitySelect.value;
+            entitySelect.innerHTML = '<option value="">-- All Entities --</option>';
+            
+            let allEntities = allData.map(function(n) { return n.name; });
+            allEntities.forEach(function(name) {
+                let option = document.createElement('option');
+                option.value = name;
+                option.text = name;
+                entitySelect.appendChild(option);
+            });
+
+            entitySelect.value = currentValue;
+        }
+
+        function renderVisualization(filterType, selectedEntity, resetZoom) {
+            let currentTransform = resetZoom ? null : d3.zoomTransform(d3.select('#diagram').node());
+            
+            d3.select('#diagram').selectAll('*').remove();
+
+            let svg = d3.select('#diagram')
+                .attr('width', width)
+                .attr('height', height);
+
+            let filteredData = allData.slice();
+            
+            if (filterType === 'subscriptions') {
+                filteredData = filteredData.filter(function(d) { return !d.isClient; });
+            } else if (filterType === 'clients') {
+                filteredData = filteredData.filter(function(d) { return d.isClient; });
+            } else if (filterType === 'subscriptions-clients') {
+                let connectedIds = new Set();
+                
+                allData.forEach(function(node) {
+                    if (node.isClient && node.subscribedWorkspaceIds) {
+                        node.subscribedWorkspaceIds.forEach(function(wId) {
+                            let workspace = allData.find(function(n) { return n.id === wId; });
+                            if (workspace && !workspace.isClient) {
+                                connectedIds.add(node.id);
+                                connectedIds.add(workspace.id);
+                            }
+                        });
+                    }
+                });
+                
+                filteredData = filteredData.filter(function(d) { return connectedIds.has(d.id); });
+            }
+
+            if (selectedEntity) {
+                let selectedNode = allData.find(function(n) { return n.name === selectedEntity; });
+                if (selectedNode) {
+                    let connectedIds = new Set([selectedNode.id]);
+                    
+                    // Add parent if exists
+                    if (selectedNode.parent_id) {
+                        connectedIds.add(selectedNode.parent_id);
+                    }
+                    
+                    // Add children (nodes with this node as parent_id)
+                    allData.forEach(function(node) {
+                        if (node.parent_id === selectedNode.id) {
+                            connectedIds.add(node.id);
+                        }
+                    });
+
+                    // Add subscribed workspaces if this is a client
+                    if (selectedNode.isClient && selectedNode.subscribedWorkspaceIds) {
+                        selectedNode.subscribedWorkspaceIds.forEach(function(wId) {
+                            connectedIds.add(wId);
+                        });
+                    }
+
+                    filteredData = filteredData.filter(function(d) {
+                        return connectedIds.has(d.id);
+                    });
+                }
+            }
+
+            let idMap = {};
+            let levels = {};
+            
+            for (let i = 0; i < filteredData.length; i++) {
+                idMap[filteredData[i].id] = filteredData[i];
+            }
+            
+            function getLevel(nodeId) {
+                if (levels[nodeId] !== undefined) {
+                    return levels[nodeId];
+                }
+                
+                let node = idMap[nodeId];
+                if (!node) return 0;
+                
+                if (!node.parent_id) {
+                    levels[nodeId] = 0;
+                    return 0;
+                }
+                
+                if (idMap[node.parent_id]) {
+                    let parentLevel = getLevel(node.parent_id);
+                    levels[nodeId] = parentLevel + 1;
+                } else {
+                    levels[nodeId] = 0;
+                }
+                
+                return levels[nodeId];
+            }
+            
+            for (let i = 0; i < filteredData.length; i++) {
+                getLevel(filteredData[i].id);
+            }
+
+            let internalNodes = filteredData.filter(function(d) { return !d.isClient; });
+            let clientNodes = filteredData.filter(function(d) { return d.isClient; });
+
+            let maxInternalLevel = 0;
+            internalNodes.forEach(function(n) {
+                if (levels[n.id] > maxInternalLevel) {
+                    maxInternalLevel = levels[n.id];
+                }
+            });
+
+            let levelGroups = {};
+            internalNodes.forEach(function(n) {
+                let level = levels[n.id];
+                if (!levelGroups[level]) levelGroups[level] = [];
+                levelGroups[level].push(n);
+            });
+
+            clientNodes.forEach(function(n) {
+                let level = levels[n.id] + maxInternalLevel + 1;
+                if (!levelGroups[level]) levelGroups[level] = [];
+                levelGroups[level].push(n);
+            });
+
+            let positions = {};
+            for (let level in levelGroups) {
+                let levelWidth = levelGroups[level].length * (nodeWidth + 80);
+                let startX = (width - levelWidth) / 2;
+                levelGroups[level].forEach(function(node, i) {
+                    let x = startX + i * (nodeWidth + 80);
+                    let y = level * levelHeight;
+                    positions[node.id] = { x: x, y: y };
+                });
+            }
+
+            let g = svg.append('g').attr('transform', 'translate(0, 20)');
+
+            let zoom = d3.zoom().on('zoom', function(event) {
+                currentZoomTransform = event.transform;
+                g.attr('transform', event.transform);
+            });
+            svg.call(zoom);
+
+            // Pan to center top after render
+            setTimeout(function() {
+                if (resetZoom) {
+                    let svgNode = svg.node();
+                    let svgViewportWidth = svgNode.parentNode.clientWidth;
+                    let centerX = width / 2;
+                    let offsetX = svgViewportWidth / 2 - centerX;
+                    let offsetY = 0;
+                    
+                    let transform = d3.zoomIdentity.translate(offsetX, offsetY);
+                    svg.call(zoom.transform, transform);
+                    currentZoomTransform = transform;
+                } else if (currentTransform) {
+                    svg.call(zoom.transform, currentTransform);
+                }
+            }, 0);
+
+            if (filterType === 'both' || internalNodes.length > 0) {
+                let internalLaneHeight = (maxInternalLevel + 1) * levelHeight;
+                g.append('rect')
+                    .attr('x', 0).attr('y', 0).attr('width', width).attr('height', internalLaneHeight)
+                    .attr('fill', '#E8F8F5').attr('stroke', '#16A085').attr('stroke-width', 2).attr('opacity', 0.3);
+                g.append('text')
+                    .attr('x', 10).attr('y', 30).attr('font-size', '16px').attr('font-weight', 'bold')
+                    .attr('fill', '#16A085').text('Subscriptions');
+            }
+
+            if (filterType === 'both' || clientNodes.length > 0) {
+                let internalLaneHeight = (maxInternalLevel + 1) * levelHeight;
+                g.append('rect')
+                    .attr('x', 0).attr('y', internalLaneHeight).attr('width', width)
+                    .attr('height', height - internalLaneHeight)
+                    .attr('fill', '#FADBD8').attr('stroke', '#C0392B').attr('stroke-width', 2).attr('opacity', 0.3);
+                g.append('text')
+                    .attr('x', 10).attr('y', internalLaneHeight + 30).attr('font-size', '16px').attr('font-weight', 'bold')
+                    .attr('fill', '#C0392B').text('Clients');
+            }
+
+            let links = [];
+            filteredData.forEach(function(node) {
+                // Handle parent_id relationships (for subscriptions and client hierarchy)
+                if (node.parent_id) {
+                    let parent = idMap[node.parent_id];
+                    if (parent && positions[node.parent_id] && positions[node.id]) {
+                        let parentPos = positions[node.parent_id];
+                        let childPos = positions[node.id];
+                        
+                        let linkType = '';
+                        if (!parent.isClient && !node.isClient) {
+                            linkType = 'internal-to-internal';
+                        } else if (!parent.isClient && node.isClient) {
+                            linkType = 'internal-to-client';
+                        } else if (parent.isClient && node.isClient) {
+                            linkType = 'client-to-client';
+                        }
+                        
+                        links.push({
+                            x1: parentPos.x + nodeWidth / 2,
+                            y1: parentPos.y + nodeHeight,
+                            x2: childPos.x + nodeWidth / 2,
+                            y2: childPos.y,
+                            type: linkType
+                        });
+                    }
+                }
+
+                // Handle subscribedWorkspaceIds relationships (only for clients)
+                if (node.isClient && node.subscribedWorkspaceIds) {
+                    node.subscribedWorkspaceIds.forEach(function(workspaceId) {
+                        let workspace = idMap[workspaceId];
+                        if (workspace && positions[workspaceId] && positions[node.id]) {
+                            let workspacePos = positions[workspaceId];
+                            let clientPos = positions[node.id];
+                            
+                            links.push({
+                                x1: workspacePos.x + nodeWidth / 2,
+                                y1: workspacePos.y + nodeHeight,
+                                x2: clientPos.x + nodeWidth / 2,
+                                y2: clientPos.y,
+                                type: 'internal-to-client'
+                            });
+                        }
+                    });
+                }
+            });
+
+            g.selectAll('line').data(links).enter().append('line')
+                .attr('x1', function(d) { return d.x1; })
+                .attr('y1', function(d) { return d.y1; })
+                .attr('x2', function(d) { return d.x2; })
+                .attr('y2', function(d) { return d.y2; })
+                .attr('stroke', function(d) {
+                    if (d.type === 'internal-to-internal') return '#4ECDC4';
+                    if (d.type === 'internal-to-client') return '#0000ff';
+                    if (d.type === 'client-to-client') return '#FF6B6B';
+                    return '#999';
+                })
+                .attr('stroke-width', 2).attr('opacity', 0.6);
+
+            let nodeGroups = g.selectAll('g.node').data(filteredData).enter()
+                .append('g').attr('class', 'node')
+                .attr('transform', function(d) {
+                    let p = positions[d.id];
+                    return 'translate(' + p.x + ',' + p.y + ')';
+                });
+
+            nodeGroups.append('rect')
+                .attr('width', nodeWidth).attr('height', nodeHeight)
+                .attr('fill', function(d) { return d.isClient ? '#FF6B6B' : '#4ECDC4'; })
+                .attr('stroke', '#2C3E50').attr('stroke-width', 2).attr('rx', 5);
+
+            nodeGroups.append('text')
+                .attr('x', nodeWidth / 2).attr('y', nodeHeight / 2 - 5)
+                .attr('text-anchor', 'middle').attr('fill', 'white')
+                .attr('font-weight', 'bold').attr('font-size', '12px')
+                .text(function(d) { return d.name; });
+
+            nodeGroups.append('text')
+                .attr('x', nodeWidth / 2).attr('y', nodeHeight / 2 + 15)
+                .attr('text-anchor', 'middle').attr('fill', 'white')
+                .attr('font-size', '10px')
+                .text(function(d) { return d.isClient ? 'Client' : 'Internal'; });
+
+            nodeGroups.on('mouseenter', function(event, d) {
+                let nodeEl = d3.select(this);
+                let buttonRadius = 50;
+                let buttons = [];
+
+                if (d.isClient) {
+                    buttons = [
+                        { angle: 90, label: '+', action: 'addClient', color: '#FF6B6B' }
+                    ];
+                } else {
+                    buttons = [
+                        { angle: 60, label: '+', action: 'addSubscription', color: '#4ECDC4' },
+                        { angle: 120, label: '+', action: 'addClient', color: '#0000ff' }
+                    ];
+                }
+
+                let menuGroup = nodeEl.append('g').attr('class', 'node-menu');
+
+                buttons.forEach(function(btn) {
+                    let radian = (btn.angle) * Math.PI / 180;
+                    let btnX = nodeWidth / 2 + Math.cos(radian) * buttonRadius;
+                    let btnY = nodeHeight / 2 + Math.sin(radian) * buttonRadius;
+                    let btnRadius = 20;
+
+                    menuGroup.append('circle')
+                        .attr('cx', btnX).attr('cy', btnY).attr('r', btnRadius)
+                        .attr('fill', btn.color).attr('stroke', 'white').attr('stroke-width', 2)
+                        .attr('opacity', 0.9).attr('cursor', 'pointer')
+                        .on('mouseenter', function() {
+                            d3.select(this).attr('r', btnRadius + 5)
+                                .attr('fill', d3.color(btn.color).darker(1));
+                        })
+                        .on('mouseleave', function() {
+                            d3.select(this).attr('r', btnRadius).attr('fill', btn.color);
+                        })
+                        .on('click', function() {
+                            console.log('Callback:', btn.action, 'for', d.name);
+                            console.log('Selected node:', d);
+                            if (btn.action === 'addSubscription') {
+                                alert('Add new Subscription under: ' + d.name);
+                            } else if (btn.action === 'addClient') {
+                                alert('Add new Client under: ' + d.name);
+                            }
+                        });
+
+                    menuGroup.append('text')
+                        .attr('x', btnX).attr('y', btnY + 7)
+                        .attr('text-anchor', 'middle').attr('fill', 'white')
+                        .attr('font-size', '20px').attr('font-weight', 'bold')
+                        .attr('pointer-events', 'none').text(btn.label);
+                });
+            })
+            .on('mouseleave', function() {
+                d3.select(this).selectAll('.node-menu').remove();
+            });
+        }
+
+        // Initialize
+        populateEntitySelect();
+        renderVisualization('both', '', true);
+
+        // Event listeners
+        document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                let filterType = this.value;
+                let selectedEntity = document.getElementById('entitySelect').value;
+                renderVisualization(filterType, selectedEntity, false);
+            });
+        });
+
+        document.getElementById('entitySelect').addEventListener('change', function() {
+            let filterType = document.querySelector('input[name="filter"]:checked').value;
+            let selectedEntity = this.value;
+            renderVisualization(filterType, selectedEntity, false);
+        });
+    </script>
+</body>
 </html>
