@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>D3 Multiple Inheritance</title>
+    <title>D3 Collapsible Tree - Organization Structure</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/default.min.css">
@@ -78,30 +78,6 @@
         .reset-btn:hover {
             background-color: #da190b;
         }
-        .filters {
-            margin-bottom: 15px;
-        }
-        .filter-group {
-            margin-bottom: 10px;
-        }
-        .filter-group label {
-            margin-right: 15px;
-            font-size: 12px;
-        }
-        .filter-group input[type="radio"] {
-            margin-right: 5px;
-        }
-        .entity-select {
-            padding: 6px 8px;
-            font-size: 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        svg {
-            flex: 1;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
         .error-message {
             background-color: #ffebee;
             color: #c62828;
@@ -110,6 +86,49 @@
             margin-bottom: 10px;
             font-size: 12px;
             display: none;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f0f0f0;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+        }
+        .tab-button.active {
+            background-color: white;
+            border-bottom-color: #4CAF50;
+            color: #4CAF50;
+        }
+        .tab-button:hover {
+            background-color: #e0e0e0;
+        }
+        svg {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fafafa;
+            overflow: auto;
+        }
+        .node rect {
+            cursor: pointer;
+        }
+        .node text {
+            font-size: 11px;
+            pointer-events: none;
+        }
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-width: 2px;
         }
     </style>
 </head>
@@ -126,23 +145,12 @@
         </div>
 
         <div class="viz-section">
-            <h2 style="margin: 0 0 15px 0; text-align: center; color: #333;">Organization Structure</h2>
-            
-            <div class="filters">
-                <div class="filter-group">
-                    <label><input type="radio" name="filter" value="both" checked> Both</label>
-                    <label><input type="radio" name="filter" value="subscriptions"> Subscriptions</label>
-                    <label><input type="radio" name="filter" value="clients"> Clients</label>
-                    <label><input type="radio" name="filter" value="subscriptions-clients"> Subscriptions → Clients</label>
-                </div>
-                <div class="filter-group">
-                    <label for="entitySelect" style="font-weight: bold;">Select Entity:</label>
-                    <select id="entitySelect" class="entity-select">
-                        <option value="">-- All Entities --</option>
-                    </select>
-                </div>
+            <h2 style="margin: 0 0 10px 0; text-align: center; color: #333;">Organization Structure</h2>
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('clients')">Clients</button>
+                <button class="tab-button" onclick="switchTab('subscriptions')">Subscriptions</button>
+                <button class="tab-button" onclick="switchTab('mapping')">Subscriptions → Clients</button>
             </div>
-
             <svg id="diagram"></svg>
         </div>
     </div>
@@ -172,20 +180,16 @@
 
             { id: 18, name: 'Apple', isClient: true, status: 'Active', parent_id: null, subscribedWorkspaceIds: [1, 5] },
             { id: 19, name: 'Apple India', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
-            { id: 20, name: 'Apple USA', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
-            { id: 21, name: 'Apple UK', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [9] },
+            { id: 20, name: 'Apple USA', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [9] },
+            { id: 21, name: 'Apple UK', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
             { id: 22, name: 'Apple Canada', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] }
         ];
 
         let allData = JSON.parse(JSON.stringify(defaultData));
-        let nodeWidth = 140;
-        let nodeHeight = 60;
-        let levelHeight = 150;
-        let width = 4000;
-        let height = 1200;
-        let currentZoomTransform = null;
+        let currentTab = 'clients';
+        let i = 0;
+        let duration = 750;
 
-        // Initialize CodeMirror
         let editor = CodeMirror.fromTextArea(document.getElementById('dataEditor'), {
             mode: 'javascript',
             theme: 'default',
@@ -219,10 +223,7 @@
                     throw new Error('Data must be an array');
                 }
 
-                populateEntitySelect();
-                let filterType = document.querySelector('input[name="filter"]:checked').value;
-                let selectedEntity = document.getElementById('entitySelect').value;
-                renderVisualization(filterType, selectedEntity, true);
+                renderVisualization(currentTab);
             } catch (error) {
                 showError('Error: ' + error.message);
             }
@@ -232,365 +233,431 @@
             hideError();
             allData = JSON.parse(JSON.stringify(defaultData));
             editor.setValue(JSON.stringify(defaultData, null, 2));
-            populateEntitySelect();
-            let filterType = document.querySelector('input[name="filter"]:checked').value;
-            let selectedEntity = document.getElementById('entitySelect').value;
-            renderVisualization(filterType, selectedEntity, true);
+            renderVisualization(currentTab);
         }
 
-        function populateEntitySelect() {
-            let entitySelect = document.getElementById('entitySelect');
-            let currentValue = entitySelect.value;
-            entitySelect.innerHTML = '<option value="">-- All Entities --</option>';
-            
-            let allEntities = allData.map(function(n) { return n.name; });
-            allEntities.forEach(function(name) {
-                let option = document.createElement('option');
-                option.value = name;
-                option.text = name;
-                entitySelect.appendChild(option);
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-button').forEach(function(btn) {
+                btn.classList.remove('active');
             });
-
-            entitySelect.value = currentValue;
+            event.target.classList.add('active');
+            renderVisualization(tab);
         }
 
-        function renderVisualization(filterType, selectedEntity, resetZoom) {
-            let currentTransform = resetZoom ? null : d3.zoomTransform(d3.select('#diagram').node());
+        function buildHierarchy(data) {
+            let roots = data.filter(function(d) { return !d.parent_id; });
+            let idMap = {};
             
+            for (let k = 0; k < data.length; k++) {
+                idMap[data[k].id] = data[k];
+            }
+
+            function buildNode(nodeData) {
+                let children = data.filter(function(d) { return d.parent_id === nodeData.id; });
+                let node = {
+                    id: nodeData.id,
+                    name: nodeData.name,
+                    isClient: nodeData.isClient,
+                    subscribedWorkspaceIds: nodeData.subscribedWorkspaceIds || [],
+                    children: children.length > 0 ? [] : null
+                };
+
+                if (children.length > 0) {
+                    for (let j = 0; j < children.length; j++) {
+                        node.children.push(buildNode(children[j]));
+                    }
+                }
+
+                return node;
+            }
+
+            let result = [];
+            for (let i = 0; i < roots.length; i++) {
+                result.push(buildNode(roots[i]));
+            }
+            return result;
+        }
+
+        function collapse(d) {
+            if (d.children) {
+                d._children = d.children;
+                for (let i = 0; i < d._children.length; i++) {
+                    collapse(d._children[i]);
+                }
+                d.children = null;
+            }
+        }
+
+        function renderVisualization(tab) {
             d3.select('#diagram').selectAll('*').remove();
 
+            let margin = { top: 20, right: 90, bottom: 30, left: 90 };
+            let width = document.getElementById('diagram').parentElement.clientWidth - 40 - margin.left - margin.right;
+            let height = document.getElementById('diagram').parentElement.clientHeight - 100 - margin.top - margin.bottom;
+
             let svg = d3.select('#diagram')
-                .attr('width', width)
-                .attr('height', height);
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-            let filteredData = allData.slice();
-            
-            if (filterType === 'subscriptions') {
-                filteredData = filteredData.filter(function(d) { return !d.isClient; });
-            } else if (filterType === 'clients') {
-                filteredData = filteredData.filter(function(d) { return d.isClient; });
-            } else if (filterType === 'subscriptions-clients') {
-                let connectedIds = new Set();
+            let treemap = d3.tree().size([height, width]);
+            let root, treeData;
+
+            if (tab === 'clients') {
+                let clientData = allData.filter(function(d) { return d.isClient; });
+                let hierarchy = buildHierarchy(clientData);
                 
-                allData.forEach(function(node) {
-                    if (node.isClient && node.subscribedWorkspaceIds) {
-                        node.subscribedWorkspaceIds.forEach(function(wId) {
-                            let workspace = allData.find(function(n) { return n.id === wId; });
-                            if (workspace && !workspace.isClient) {
-                                connectedIds.add(node.id);
-                                connectedIds.add(workspace.id);
-                            }
-                        });
-                    }
+                treeData = {
+                    name: 'Clients',
+                    children: hierarchy,
+                    isClient: true
+                };
+
+                root = d3.hierarchy(treeData, function(d) {
+                    return d.children;
                 });
-                
-                filteredData = filteredData.filter(function(d) { return connectedIds.has(d.id); });
-            }
 
-            if (selectedEntity) {
-                let selectedNode = allData.find(function(n) { return n.name === selectedEntity; });
-                if (selectedNode) {
-                    let connectedIds = new Set([selectedNode.id]);
-                    
-                    // Add parent if exists
-                    if (selectedNode.parent_id) {
-                        connectedIds.add(selectedNode.parent_id);
+                root.x0 = height / 2;
+                root.y0 = 0;
+                if (root.children) {
+                    for (let i = 0; i < root.children.length; i++) {
+                        collapse(root.children[i]);
                     }
-                    
-                    // Add children (nodes with this node as parent_id)
-                    allData.forEach(function(node) {
-                        if (node.parent_id === selectedNode.id) {
-                            connectedIds.add(node.id);
-                        }
-                    });
-
-                    // Add subscribed workspaces if this is a client
-                    if (selectedNode.isClient && selectedNode.subscribedWorkspaceIds) {
-                        selectedNode.subscribedWorkspaceIds.forEach(function(wId) {
-                            connectedIds.add(wId);
-                        });
-                    }
-
-                    filteredData = filteredData.filter(function(d) {
-                        return connectedIds.has(d.id);
-                    });
                 }
-            }
 
-            let idMap = {};
-            let levels = {};
-            
-            for (let i = 0; i < filteredData.length; i++) {
-                idMap[filteredData[i].id] = filteredData[i];
-            }
-            
-            function getLevel(nodeId) {
-                if (levels[nodeId] !== undefined) {
-                    return levels[nodeId];
-                }
+            } else if (tab === 'subscriptions') {
+                let subData = allData.filter(function(d) { return !d.isClient; });
+                let hierarchy = buildHierarchy(subData);
                 
-                let node = idMap[nodeId];
-                if (!node) return 0;
-                
-                if (!node.parent_id) {
-                    levels[nodeId] = 0;
-                    return 0;
-                }
-                
-                if (idMap[node.parent_id]) {
-                    let parentLevel = getLevel(node.parent_id);
-                    levels[nodeId] = parentLevel + 1;
-                } else {
-                    levels[nodeId] = 0;
-                }
-                
-                return levels[nodeId];
-            }
-            
-            for (let i = 0; i < filteredData.length; i++) {
-                getLevel(filteredData[i].id);
-            }
+                treeData = {
+                    name: 'Subscriptions',
+                    children: hierarchy,
+                    isClient: false
+                };
 
-            let internalNodes = filteredData.filter(function(d) { return !d.isClient; });
-            let clientNodes = filteredData.filter(function(d) { return d.isClient; });
-
-            let maxInternalLevel = 0;
-            internalNodes.forEach(function(n) {
-                if (levels[n.id] > maxInternalLevel) {
-                    maxInternalLevel = levels[n.id];
-                }
-            });
-
-            let levelGroups = {};
-            internalNodes.forEach(function(n) {
-                let level = levels[n.id];
-                if (!levelGroups[level]) levelGroups[level] = [];
-                levelGroups[level].push(n);
-            });
-
-            clientNodes.forEach(function(n) {
-                let level = levels[n.id] + maxInternalLevel + 1;
-                if (!levelGroups[level]) levelGroups[level] = [];
-                levelGroups[level].push(n);
-            });
-
-            let positions = {};
-            for (let level in levelGroups) {
-                let levelWidth = levelGroups[level].length * (nodeWidth + 80);
-                let startX = (width - levelWidth) / 2;
-                levelGroups[level].forEach(function(node, i) {
-                    let x = startX + i * (nodeWidth + 80);
-                    let y = level * levelHeight;
-                    positions[node.id] = { x: x, y: y };
+                root = d3.hierarchy(treeData, function(d) {
+                    return d.children;
                 });
-            }
 
-            let g = svg.append('g').attr('transform', 'translate(0, 20)');
-
-            let zoom = d3.zoom().on('zoom', function(event) {
-                currentZoomTransform = event.transform;
-                g.attr('transform', event.transform);
-            });
-            svg.call(zoom);
-
-            // Pan to center top after render
-            setTimeout(function() {
-                if (resetZoom) {
-                    let svgNode = svg.node();
-                    let svgViewportWidth = svgNode.parentNode.clientWidth;
-                    let centerX = width / 2;
-                    let offsetX = svgViewportWidth / 2 - centerX;
-                    let offsetY = 0;
-                    
-                    let transform = d3.zoomIdentity.translate(offsetX, offsetY);
-                    svg.call(zoom.transform, transform);
-                    currentZoomTransform = transform;
-                } else if (currentTransform) {
-                    svg.call(zoom.transform, currentTransform);
-                }
-            }, 0);
-
-            if (filterType === 'both' || internalNodes.length > 0) {
-                let internalLaneHeight = (maxInternalLevel + 1) * levelHeight;
-                g.append('rect')
-                    .attr('x', 0).attr('y', 0).attr('width', width).attr('height', internalLaneHeight)
-                    .attr('fill', '#E8F8F5').attr('stroke', '#16A085').attr('stroke-width', 2).attr('opacity', 0.3);
-                g.append('text')
-                    .attr('x', 10).attr('y', 30).attr('font-size', '16px').attr('font-weight', 'bold')
-                    .attr('fill', '#16A085').text('Subscriptions');
-            }
-
-            if (filterType === 'both' || clientNodes.length > 0) {
-                let internalLaneHeight = (maxInternalLevel + 1) * levelHeight;
-                g.append('rect')
-                    .attr('x', 0).attr('y', internalLaneHeight).attr('width', width)
-                    .attr('height', height - internalLaneHeight)
-                    .attr('fill', '#FADBD8').attr('stroke', '#C0392B').attr('stroke-width', 2).attr('opacity', 0.3);
-                g.append('text')
-                    .attr('x', 10).attr('y', internalLaneHeight + 30).attr('font-size', '16px').attr('font-weight', 'bold')
-                    .attr('fill', '#C0392B').text('Clients');
-            }
-
-            let links = [];
-            filteredData.forEach(function(node) {
-                // Handle parent_id relationships (for subscriptions and client hierarchy)
-                if (node.parent_id) {
-                    let parent = idMap[node.parent_id];
-                    if (parent && positions[node.parent_id] && positions[node.id]) {
-                        let parentPos = positions[node.parent_id];
-                        let childPos = positions[node.id];
-                        
-                        let linkType = '';
-                        if (!parent.isClient && !node.isClient) {
-                            linkType = 'internal-to-internal';
-                        } else if (!parent.isClient && node.isClient) {
-                            linkType = 'internal-to-client';
-                        } else if (parent.isClient && node.isClient) {
-                            linkType = 'client-to-client';
-                        }
-                        
-                        links.push({
-                            x1: parentPos.x + nodeWidth / 2,
-                            y1: parentPos.y + nodeHeight,
-                            x2: childPos.x + nodeWidth / 2,
-                            y2: childPos.y,
-                            type: linkType
-                        });
+                root.x0 = height / 2;
+                root.y0 = 0;
+                if (root.children) {
+                    for (let i = 0; i < root.children.length; i++) {
+                        collapse(root.children[i]);
                     }
                 }
 
-                // Handle subscribedWorkspaceIds relationships (only for clients)
-                if (node.isClient && node.subscribedWorkspaceIds) {
-                    node.subscribedWorkspaceIds.forEach(function(workspaceId) {
-                        let workspace = idMap[workspaceId];
-                        if (workspace && positions[workspaceId] && positions[node.id]) {
-                            let workspacePos = positions[workspaceId];
-                            let clientPos = positions[node.id];
-                            
+            } else if (tab === 'mapping') {
+                // For mapping tab, use a different visualization - bipartite graph
+                renderMappingVisualization(svg, width, height);
+                return;
+            }
+
+            update(root);
+
+            function renderMappingVisualization(svg, width, height) {
+                // Get root subscriptions and clients with subscriptions
+                let rootSubscriptions = allData.filter(function(d) { 
+                    return !d.isClient && !d.parent_id; 
+                });
+
+                let clientsWithSubs = allData.filter(function(d) { 
+                    return d.isClient && d.subscribedWorkspaceIds && d.subscribedWorkspaceIds.length > 0; 
+                });
+
+                // Define unique colors for each client - randomized but deterministic
+                let colorPalette = [
+                    '#FF1744', '#F50057', '#D50000', '#C51162',
+                    '#304FFE', '#2979F3', '#2196F3', '#1976D2',
+                    '#00B0FF', '#0288D1', '#03A9F4', '#0277BD',
+                    '#00E5FF', '#0097A7', '#00BCD4', '#0088A3',
+                    '#1DE9B6', '#009688', '#00897B', '#00695C',
+                    '#00E676', '#00C853', '#76FF03', '#64DD17',
+                    '#FFEB3B', '#FDD835', '#FBC02D', '#F9A825',
+                    '#FFC400', '#FFB300', '#FFA000', '#FF8F00',
+                    '#FF6F00', '#E65100', '#FF5722', '#E64A19',
+                    '#FF9800', '#F57C00', '#FF7043', '#F4511E',
+                    '#FF5252', '#FF1744', '#FF17B8', '#F50057'
+                ];
+
+                // Shuffle colors deterministically based on data
+                let shuffledColors = colorPalette.slice();
+                for (let i = shuffledColors.length - 1; i > 0; i--) {
+                    let seed = 0;
+                    for (let j = 0; j < clientsWithSubs[0].name.length; j++) {
+                        seed += clientsWithSubs[0].name.charCodeAt(j);
+                    }
+                    let j = Math.floor(((seed * (i + 1)) % (i + 1)));
+                    let temp = shuffledColors[i];
+                    shuffledColors[i] = shuffledColors[j];
+                    shuffledColors[j] = temp;
+                }
+
+                // Create nodes
+                let nodes = [];
+                let nodeMap = {};
+                
+                // Add subscription nodes on the left
+                for (let i = 0; i < rootSubscriptions.length; i++) {
+                    let node = {
+                        id: rootSubscriptions[i].id,
+                        name: rootSubscriptions[i].name,
+                        isClient: false,
+                        x: 100,
+                        y: (i + 1) * (height / (rootSubscriptions.length + 1))
+                    };
+                    nodes.push(node);
+                    nodeMap[node.id] = node;
+                }
+
+                // Add client nodes on the right with unique randomized colors
+                for (let i = 0; i < clientsWithSubs.length; i++) {
+                    let node = {
+                        id: clientsWithSubs[i].id,
+                        name: clientsWithSubs[i].name,
+                        isClient: true,
+                        color: shuffledColors[i],
+                        x: width - 100,
+                        y: (i + 1) * (height / (clientsWithSubs.length + 1))
+                    };
+                    nodes.push(node);
+                    nodeMap[node.id] = node;
+                }
+
+                // Create links
+                let links = [];
+                for (let i = 0; i < clientsWithSubs.length; i++) {
+                    let client = clientsWithSubs[i];
+                    for (let j = 0; j < client.subscribedWorkspaceIds.length; j++) {
+                        let subId = client.subscribedWorkspaceIds[j];
+                        if (nodeMap[subId]) {
                             links.push({
-                                x1: workspacePos.x + nodeWidth / 2,
-                                y1: workspacePos.y + nodeHeight,
-                                x2: clientPos.x + nodeWidth / 2,
-                                y2: clientPos.y,
-                                type: 'internal-to-client'
+                                source: nodeMap[subId],
+                                target: nodeMap[client.id],
+                                color: nodeMap[client.id].color
                             });
                         }
+                    }
+                }
+
+                // Draw links first
+                svg.selectAll('.mapping-link')
+                    .data(links)
+                    .enter()
+                    .append('line')
+                    .attr('class', 'mapping-link')
+                    .attr('x1', function(d) { return d.source.x; })
+                    .attr('y1', function(d) { return d.source.y; })
+                    .attr('x2', function(d) { return d.target.x; })
+                    .attr('y2', function(d) { return d.target.y; })
+                    .attr('stroke', function(d) { return d.color; })
+                    .attr('stroke-width', 2.5)
+                    .attr('opacity', 0.7);
+
+                // Draw nodes
+                let nodeGroups = svg.selectAll('.mapping-node')
+                    .data(nodes)
+                    .enter()
+                    .append('g')
+                    .attr('class', 'mapping-node')
+                    .attr('transform', function(d) { 
+                        return 'translate(' + d.x + ',' + d.y + ')'; 
                     });
+
+                nodeGroups.append('rect')
+                    .attr('x', -35)
+                    .attr('y', -16)
+                    .attr('width', 70)
+                    .attr('height', 32)
+                    .attr('rx', 6)
+                    .attr('ry', 6)
+                    .attr('stroke-width', 2)
+                    .attr('stroke', function(d) {
+                        if (d.isClient) return d.color;
+                        return '#0C2340';
+                    })
+                    .attr('fill', function(d) {
+                        if (d.isClient) return d.color;
+                        return '#0369A1';
+                    })
+                    .style('filter', 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15))');
+
+                nodeGroups.append('text')
+                    .attr('x', 0)
+                    .attr('y', 0)
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#FFFFFF')
+                    .attr('font-weight', '600')
+                    .attr('font-size', '12px')
+                    .text(function(d) { 
+                        return d.name; 
+                    });
+
+                // Add labels
+                svg.append('text')
+                    .attr('x', 100)
+                    .attr('y', 30)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#374151')
+                    .attr('font-weight', 'bold')
+                    .attr('font-size', '14px')
+                    .text('Subscriptions');
+
+                svg.append('text')
+                    .attr('x', width - 100)
+                    .attr('y', 30)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#374151')
+                    .attr('font-weight', 'bold')
+                    .attr('font-size', '14px')
+                    .text('Clients');
+            }
+
+            function update(source) {
+                let nodes = treemap(root).descendants();
+                let links = treemap(root).descendants().slice(1);
+
+                for (let j = 0; j < nodes.length; j++) {
+                    nodes[j].y = nodes[j].depth * 180;
                 }
-            });
 
-            g.selectAll('line').data(links).enter().append('line')
-                .attr('x1', function(d) { return d.x1; })
-                .attr('y1', function(d) { return d.y1; })
-                .attr('x2', function(d) { return d.x2; })
-                .attr('y2', function(d) { return d.y2; })
-                .attr('stroke', function(d) {
-                    if (d.type === 'internal-to-internal') return '#4ECDC4';
-                    if (d.type === 'internal-to-client') return '#0000ff';
-                    if (d.type === 'client-to-client') return '#FF6B6B';
-                    return '#999';
-                })
-                .attr('stroke-width', 2).attr('opacity', 0.6);
-
-            let nodeGroups = g.selectAll('g.node').data(filteredData).enter()
-                .append('g').attr('class', 'node')
-                .attr('transform', function(d) {
-                    let p = positions[d.id];
-                    return 'translate(' + p.x + ',' + p.y + ')';
+                let node = svg.selectAll('g.node').data(nodes, function(d) {
+                    return d.id || (d.id = ++i);
                 });
 
-            nodeGroups.append('rect')
-                .attr('width', nodeWidth).attr('height', nodeHeight)
-                .attr('fill', function(d) { return d.isClient ? '#FF6B6B' : '#4ECDC4'; })
-                .attr('stroke', '#2C3E50').attr('stroke-width', 2).attr('rx', 5);
+                let nodeEnter = node.enter()
+                    .append('g')
+                    .attr('class', 'node')
+                    .attr('transform', function(d) {
+                        return 'translate(' + source.y0 + ',' + source.x0 + ')';
+                    })
+                    .on('click', click);
 
-            nodeGroups.append('text')
-                .attr('x', nodeWidth / 2).attr('y', nodeHeight / 2 - 5)
-                .attr('text-anchor', 'middle').attr('fill', 'white')
-                .attr('font-weight', 'bold').attr('font-size', '12px')
-                .text(function(d) { return d.name; });
+                nodeEnter.append('rect')
+                    .attr('rx', function(d) {
+                        if (d.parent) return d.children || d._children ? 0 : 6;
+                        return 8;
+                    })
+                    .attr('ry', function(d) {
+                        if (d.parent) return d.children || d._children ? 0 : 6;
+                        return 8;
+                    })
+                    .attr('stroke-width', function(d) {
+                        return d.parent ? 2 : 0;
+                    })
+                    .attr('stroke', function(d) {
+                        if (!d.parent) return 'none';
+                        return d.children || d._children ? '#2C5282' : '#2F855A';
+                    })
+                    .attr('stroke-dasharray', function(d) {
+                        return d.children || d._children ? '0' : '3';
+                    })
+                    .attr('stroke-opacity', function(d) {
+                        return d.children || d._children ? '1' : '0.7';
+                    })
+                    .attr('x', -40)
+                    .attr('y', -18)
+                    .attr('width', 80)
+                    .attr('height', 36)
+                    .style('fill', function(d) {
+                        if (!d.parent) return '#1F2937';
+                        if (d.children || d._children) {
+                            return d.data.isClient ? '#C84E1B' : '#0369A1';
+                        }
+                        return d.data.isClient ? '#DC2626' : '#0891B2';
+                    })
+                    .style('filter', 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15))');
 
-            nodeGroups.append('text')
-                .attr('x', nodeWidth / 2).attr('y', nodeHeight / 2 + 15)
-                .attr('text-anchor', 'middle').attr('fill', 'white')
-                .attr('font-size', '10px')
-                .text(function(d) { return d.isClient ? 'Client' : 'Internal'; });
+                nodeEnter.append('text')
+                    .style('fill', '#FFFFFF')
+                    .attr('dy', '.35em')
+                    .attr('x', 0)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-weight', '600')
+                    .attr('font-size', '12px')
+                    .text(function(d) {
+                        return d.data.name;
+                    });
 
-            nodeGroups.on('mouseenter', function(event, d) {
-                let nodeEl = d3.select(this);
-                let buttonRadius = 50;
-                let buttons = [];
+                let nodeUpdate = nodeEnter.merge(node);
 
-                if (d.isClient) {
-                    buttons = [
-                        { angle: 90, label: '+', action: 'addClient', color: '#FF6B6B' }
-                    ];
-                } else {
-                    buttons = [
-                        { angle: 60, label: '+', action: 'addSubscription', color: '#4ECDC4' },
-                        { angle: 120, label: '+', action: 'addClient', color: '#0000ff' }
-                    ];
+                nodeUpdate.transition()
+                    .duration(duration)
+                    .attr('transform', function(d) {
+                        return 'translate(' + d.y + ',' + d.x + ')';
+                    });
+
+                let nodeExit = node.exit()
+                    .transition()
+                    .duration(duration)
+                    .attr('transform', function(d) {
+                        return 'translate(' + source.y + ',' + source.x + ')';
+                    })
+                    .remove();
+
+                nodeExit.select('rect').style('opacity', 1e-6);
+                nodeExit.select('text').style('fill-opacity', 1e-6);
+
+                let link = svg.selectAll('path.link').data(links, function(d) {
+                    return d.id;
+                });
+
+                let linkEnter = link.enter()
+                    .insert('path', 'g')
+                    .attr('class', 'link')
+                    .attr('d', function(d) {
+                        let o = { x: source.x0, y: source.y0 };
+                        return diagonal(o, o);
+                    });
+
+                let linkUpdate = linkEnter.merge(link);
+
+                linkUpdate.transition()
+                    .duration(duration)
+                    .attr('d', function(d) {
+                        return diagonal(d, d.parent);
+                    });
+
+                let linkExit = link.exit()
+                    .transition()
+                    .duration(duration)
+                    .attr('d', function(d) {
+                        let o = { x: source.x, y: source.y };
+                        return diagonal(o, o);
+                    })
+                    .remove();
+
+                for (let k = 0; k < nodes.length; k++) {
+                    nodes[k].x0 = nodes[k].x;
+                    nodes[k].y0 = nodes[k].y;
                 }
 
-                let menuGroup = nodeEl.append('g').attr('class', 'node-menu');
+                function diagonal(s, d) {
+                    let path = 'M ' + s.y + ' ' + s.x +
+                        ' C ' + (s.y + d.y) / 2 + ' ' + s.x +
+                        ', ' + (s.y + d.y) / 2 + ' ' + d.x +
+                        ', ' + d.y + ' ' + d.x;
+                    return path;
+                }
 
-                buttons.forEach(function(btn) {
-                    let radian = (btn.angle) * Math.PI / 180;
-                    let btnX = nodeWidth / 2 + Math.cos(radian) * buttonRadius;
-                    let btnY = nodeHeight / 2 + Math.sin(radian) * buttonRadius;
-                    let btnRadius = 20;
-
-                    menuGroup.append('circle')
-                        .attr('cx', btnX).attr('cy', btnY).attr('r', btnRadius)
-                        .attr('fill', btn.color).attr('stroke', 'white').attr('stroke-width', 2)
-                        .attr('opacity', 0.9).attr('cursor', 'pointer')
-                        .on('mouseenter', function() {
-                            d3.select(this).attr('r', btnRadius + 5)
-                                .attr('fill', d3.color(btn.color).darker(1));
-                        })
-                        .on('mouseleave', function() {
-                            d3.select(this).attr('r', btnRadius).attr('fill', btn.color);
-                        })
-                        .on('click', function() {
-                            console.log('Callback:', btn.action, 'for', d.name);
-                            console.log('Selected node:', d);
-                            if (btn.action === 'addSubscription') {
-                                alert('Add new Subscription under: ' + d.name);
-                            } else if (btn.action === 'addClient') {
-                                alert('Add new Client under: ' + d.name);
-                            }
-                        });
-
-                    menuGroup.append('text')
-                        .attr('x', btnX).attr('y', btnY + 7)
-                        .attr('text-anchor', 'middle').attr('fill', 'white')
-                        .attr('font-size', '20px').attr('font-weight', 'bold')
-                        .attr('pointer-events', 'none').text(btn.label);
-                });
-            })
-            .on('mouseleave', function() {
-                d3.select(this).selectAll('.node-menu').remove();
-            });
+                function click(event, d) {
+                    if (d.children) {
+                        d._children = d.children;
+                        d.children = null;
+                    } else {
+                        d.children = d._children;
+                        d._children = null;
+                    }
+                    update(d);
+                }
+            }
         }
 
         // Initialize
-        populateEntitySelect();
-        renderVisualization('both', '', true);
-
-        // Event listeners
-        document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
-            radio.addEventListener('change', function() {
-                let filterType = this.value;
-                let selectedEntity = document.getElementById('entitySelect').value;
-                renderVisualization(filterType, selectedEntity, false);
-            });
-        });
-
-        document.getElementById('entitySelect').addEventListener('change', function() {
-            let filterType = document.querySelector('input[name="filter"]:checked').value;
-            let selectedEntity = this.value;
-            renderVisualization(filterType, selectedEntity, false);
-        });
+        renderVisualization('clients');
     </script>
 </body>
 </html>
