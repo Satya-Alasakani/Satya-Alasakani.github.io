@@ -180,7 +180,7 @@
 
             { id: 18, name: 'Apple', isClient: true, status: 'Active', parent_id: null, subscribedWorkspaceIds: [1, 5] },
             { id: 19, name: 'Apple India', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
-            { id: 20, name: 'Apple USA', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [9] },
+            { id: 20, name: 'Apple USA', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
             { id: 21, name: 'Apple UK', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] },
             { id: 22, name: 'Apple Canada', isClient: true, status: 'Active', parent_id: 18, subscribedWorkspaceIds: [] }
         ];
@@ -358,14 +358,36 @@
             update(root);
 
             function renderMappingVisualization(svg, width, height) {
-                // Get root subscriptions and clients with subscriptions
-                let rootSubscriptions = allData.filter(function(d) { 
-                    return !d.isClient && !d.parent_id; 
-                });
-
+                // Get clients with subscriptions
                 let clientsWithSubs = allData.filter(function(d) { 
                     return d.isClient && d.subscribedWorkspaceIds && d.subscribedWorkspaceIds.length > 0; 
                 });
+
+                // Get all subscriptions that are used by clients (including children)
+                let usedSubscriptionIds = new Set();
+                for (let i = 0; i < clientsWithSubs.length; i++) {
+                    let client = clientsWithSubs[i];
+                    for (let j = 0; j < client.subscribedWorkspaceIds.length; j++) {
+                        usedSubscriptionIds.add(client.subscribedWorkspaceIds[j]);
+                    }
+                }
+
+                // Get all subscriptions used (root + any children of used subscriptions)
+                let allSubscriptions = allData.filter(function(d) { return !d.isClient; });
+                let usedSubscriptions = [];
+                
+                for (let i = 0; i < allSubscriptions.length; i++) {
+                    let sub = allSubscriptions[i];
+                    if (usedSubscriptionIds.has(sub.id)) {
+                        usedSubscriptions.push(sub);
+                    }
+                    // Also add children of used subscriptions
+                    if (sub.parent_id && usedSubscriptionIds.has(sub.parent_id)) {
+                        if (!usedSubscriptions.some(function(s) { return s.id === sub.id; })) {
+                            usedSubscriptions.push(sub);
+                        }
+                    }
+                }
 
                 // Define unique colors for each client - randomized but deterministic
                 let colorPalette = [
@@ -389,24 +411,24 @@
                     for (let j = 0; j < clientsWithSubs[0].name.length; j++) {
                         seed += clientsWithSubs[0].name.charCodeAt(j);
                     }
-                    let j = Math.floor(((seed * (i + 1)) % (i + 1)));
+                    let jIdx = Math.floor(((seed * (i + 1)) % (i + 1)));
                     let temp = shuffledColors[i];
-                    shuffledColors[i] = shuffledColors[j];
-                    shuffledColors[j] = temp;
+                    shuffledColors[i] = shuffledColors[jIdx];
+                    shuffledColors[jIdx] = temp;
                 }
 
                 // Create nodes
                 let nodes = [];
                 let nodeMap = {};
                 
-                // Add subscription nodes on the left
-                for (let i = 0; i < rootSubscriptions.length; i++) {
+                // Add subscription nodes on the left (only used ones)
+                for (let i = 0; i < usedSubscriptions.length; i++) {
                     let node = {
-                        id: rootSubscriptions[i].id,
-                        name: rootSubscriptions[i].name,
+                        id: usedSubscriptions[i].id,
+                        name: usedSubscriptions[i].name,
                         isClient: false,
                         x: 100,
-                        y: (i + 1) * (height / (rootSubscriptions.length + 1))
+                        y: (i + 1) * (height / (usedSubscriptions.length + 1))
                     };
                     nodes.push(node);
                     nodeMap[node.id] = node;
