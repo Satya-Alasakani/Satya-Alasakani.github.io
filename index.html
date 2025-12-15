@@ -16,6 +16,93 @@
             background: #1a1a1a;
             overflow: hidden;
         }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #0a0e27;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 16px;
+            text-align: center;
+            font-weight: 600;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th:first-child {
+            text-align: left;
+            width: 28%;
+        }
+        
+        th:last-child {
+            border-right: none;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+        
+        td {
+            padding: 16px;
+            text-align: center;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: #0a0e27;
+            background: #f9f9f9;
+            border-right: 2px solid #e0e0e0;
+        }
+        
+        td:last-child {
+            border-right: none;
+            background: #f0f4ff;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .check {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        .cross {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 20px;
+        }
         
         .presentation {
             width: 100vw;
@@ -555,6 +642,57 @@
                     <span style="font-size: 0.9em; opacity: 0.8;">Showing seamless API testing and code generation</span>
                 </div>
                 <p style="margin-top: 20px; text-align: center; font-size: 1.3em;">✅ Understands APIs without cURL expertise</p>
+            </div>
+            <div class="slide-number">Slide 9 / 11</div>
+        </div>
+
+        <!-- Slide 9: Demo - Venkat -->
+        <div class="slide slide-demo-venkat">
+            <div class="slide-content">
+                <div class="container">
+        <h1>DevAssist AI - Competitive Comparison</h1>
+        
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Capability</th>
+                        <th>ServiceNow</th>
+                        <th>Jira Service Mgmt</th>
+                        <th>Zendesk</th>
+                        <th>BMC Helix</th>
+                        <th>DevAssist AI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Native MCP Support</td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Natural Language Search</td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Code Conversion</td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
             </div>
             <div class="slide-number">Slide 9 / 11</div>
         </div>
